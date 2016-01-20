@@ -9,6 +9,7 @@ from collections import defaultdict,OrderedDict, Counter
 import urllib
 import re
 import logging
+import csv
 
 
 def divprocessor(divlist):
@@ -56,18 +57,23 @@ class HkjcresSpider(scrapy.Spider):
     name = "hkjcres"
     allowed_domains = ["racing.hkjc.com"]
 
-    def __init__(self, racedate, racecoursecode, noraces, *args, **kwargs):
+    def __init__(self, input_filename='input.csv', *args, **kwargs):
         super(HkjcresSpider, self).__init__(*args, **kwargs)
-        self.noraces = int(noraces)
-        self.base_url = "http://racing.hkjc.com/racing/Info/Meeting/Results/English/Local/" + racedate + '/'+ racecoursecode + '/'
+
+        with open(input_filename, 'r') as f:
+            self.input_data = list(csv.DictReader(f, skipinitialspace=True))
+
+        self.base_url = "http://racing.hkjc.com/racing/Info/Meeting/Results/English/Local/"
 
     def start_requests(self):
-        #take initial url and extend to cover all races add to start urls
-        #create list then return
-        urls = list()
-        for i in range(1,self.noraces+1):
-            yield scrapy.Request( self.base_url+'{0:01}'.format(i), self.parse)
-     
+        for data in self.input_data:
+            url = self.base_url + data['racedate'] + '/' + data['racecoursecode'] + '/'
+
+            noraces = int(data['noraces'])
+
+            for i in range(1, noraces + 1):
+                yield scrapy.Request(url + '{0:01}'.format(i), self.parse)
+
     def parse(self, response):
         logger.info('A response from %s just arrived!', response.url)
         loader = RaceItemLoader(Hkjcres16Item(), response=response)
