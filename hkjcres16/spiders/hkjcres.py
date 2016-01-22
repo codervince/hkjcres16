@@ -72,7 +72,7 @@ class HkjcresSpider(scrapy.Spider):
             noraces = int(data['noraces'])
 
             for i in range(1, noraces + 1):
-                yield scrapy.Request(url + '{0:01}'.format(i), self.parse)
+                yield scrapy.Request(url + '{0:01}'.format(i), self.parse, meta={'try_num': 1})
 
     def parse(self, response):
         logger.info('A response from %s just arrived!', response.url)
@@ -90,7 +90,19 @@ class HkjcresSpider(scrapy.Spider):
         
         #race details table
         newraceinfo = response.xpath('//table[@class ="tableBorder0 font13"]//*[self::td or self::td/span]//text()').extract()
-        raceclass = newraceinfo[0].replace('-', '').strip()
+
+        try:
+            raceclass = newraceinfo[0].replace('-', '').strip()
+        except IndexError:
+            try_num = response.meta['try_num']
+            if try_num >= self.settings.get('MAX_TRYS', 5):
+                logger.info('Failed! Has reached the maximum number of attempts. %s', response.url)
+                raise StopIteration
+
+            logger.info('Add again to query %s', response.url)
+            yield scrapy.Request(response.url, self.parse, dont_filter=True, meta={'try_num': try_num + 1})
+            raise StopIteration
+
         going = response.xpath('//table[@class ="tableBorder0 font13"]//td[contains(text(),"Going")]/following-sibling::*/text()').extract()[0]
         racesurface = response.xpath('//table[@class ="tableBorder0 font13"]//td[contains(text(),"Course")]/following-sibling::*/text()').extract()[0]
         racedistance = newraceinfo[1].split(u'-')[0].replace(u'm', u'').replace(u'M', u'').strip()
@@ -188,4 +200,4 @@ class HkjcresSpider(scrapy.Spider):
         #     loader.add_xpath('link', 'a/@href')
         #     loader.add_xpath('desc', 'text()')
         # return item
-        return loader.load_item()
+        yield loader.load_item()

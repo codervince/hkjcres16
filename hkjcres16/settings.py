@@ -29,6 +29,7 @@ DATABASE = {
 }
 
 DOWNLOAD_DELAY = 3
+# MAX_TRYS = 1  # 5 by default
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'hkjcres16 (+http://www.yourdomain.com)'
