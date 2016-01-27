@@ -1,6 +1,6 @@
 import scrapy
 from scrapy.loader import ItemLoader
-from hkjcres16.items import Hkjcres16Item
+from hkjcres16.items import Hkjcres16Item, HorseItem
 from scrapy.loader.processors import TakeFirst,Compose, MapCompose, Identity, Join
 from urlparse import urlparse
 from collections import defaultdict,OrderedDict, Counter
@@ -10,13 +10,32 @@ import urllib
 import re
 import logging
 import csv
+from datetime import datetime
+import itertools
+from hkjcres16.utilities import *
 
+
+class DefaultListOrderedDict(OrderedDict):
+    def __missing__(self,k):
+        self[k] = []
+        return self[k]
 
 def divprocessor(divlist):
     return divprocessor
 
 def timetofloat(t):
     return float("{0:.2f}".format(float(t)))
+
+def dorunningpositions(l):
+    return "-".join(l)
+
+class HorseItemLoader(ItemLoader):
+    #default_output_processor = TakeFirst()
+    place_out = Join()
+    actualwt_out = Join()
+    
+    runningpositions_out = Compose(dorunningpositions)
+     
 
 class RaceItemLoader(ItemLoader):
     default_output_processor = TakeFirst()
@@ -57,6 +76,7 @@ class HkjcresSpider(scrapy.Spider):
     name = "hkjcres"
     allowed_domains = ["racing.hkjc.com"]
 
+
     def __init__(self, input_filename='input.csv', *args, **kwargs):
         super(HkjcresSpider, self).__init__(*args, **kwargs)
 
@@ -69,16 +89,26 @@ class HkjcresSpider(scrapy.Spider):
         for data in self.input_data:
             url = self.base_url + data['racedate'] + '/' + data['racecoursecode'] + '/'
 
-            noraces = int(data['noraces'])
+            self.noraces = int(data['noraces'])
+            self.racedate = datetime.strptime(data['racedate'], '%Y%M%d')
+            self.racecoursecode = data['racecoursecode'] 
 
-            for i in range(1, noraces + 1):
-                yield scrapy.Request(url + '{0:01}'.format(i), self.parse, meta={'try_num': 1})
+
+            for i in range(1, self.noraces + 1):
+                yield scrapy.Request(url + '{0:01}'.format(i), self.parse, meta={'try_num': 1, 
+                    'racedate': datetime.strftime(self.racedate, '%Y%m%d'), 
+          
+                'racecoursecode': self.racecoursecode })
 
     def parse(self, response):
         logger.info('A response from %s just arrived!', response.url)
         loader = RaceItemLoader(Hkjcres16Item(), response=response)
         item = Hkjcres16Item()      
         
+        if int(response.url.split('/')[-1]) > 9:
+            todaysracenumber = '{}'.format(response.url.split('/')[-1])
+        else:
+            todaysracenumber = '{}'.format(response.url.split('/')[-1])
         #basic race information
 
         # item['url'] = response.url
@@ -137,32 +167,142 @@ class HkjcresSpider(scrapy.Spider):
                     # print response.meta['racenumber']
                 except:
                     div_info[m] = None
+        #post race date = ?
+        div_info['JOCKEY CHALLENGE'] = response.xpath("//tr[td/text() = 'Dividend']/following-sibling::tr/td[text()='JOCKEY CHALLENGE']/following-sibling::td/text()").extract()
+        compwinstartdate = datetime.strptime("20151025", '%Y%M%d')
+        div_info['A1'] = None
+        div_info['A2'] = None
+        div_info['A3'] = None
+        todaysracedate = datetime.strptime('{}'.format(response.url.split('/')[-3]), '%Y%M%d')
+        todaysracecoursecode = response.url.split('/')[-2]
+        if todaysracedate >= compwinstartdate:
             div_info['A1'] = response.xpath("//tr[td/text() = 'Dividend']/following-sibling::tr/td[text()='A1']/following-sibling::td/text()").extract()
             div_info['A2'] = response.xpath("//tr[td/text() = 'Dividend']/following-sibling::tr/td[text()='A2']/following-sibling::td/text()").extract()
             div_info['A3'] = response.xpath("//tr[td/text() = 'Dividend']/following-sibling::tr/td[text()='A3']/following-sibling::td/text()").extract()
-            div_info['JOCKEY CHALLENGE'] = response.xpath("//tr[td/text() = 'Dividend']/following-sibling::tr/td[text()='JOCKEY CHALLENGE']/following-sibling::td/text()").extract()
-            # for m2 in markets2:
-            #     try:
-            #         xpathstr21 = str("//tr[td/text() = 'Dividend']/following-sibling::tr/td[contains(.,")
-            #         xpathstr22 = str(")]/following-sibling::td/text()")
-            #         win_divs2 =response.xpath(xpathstr21 + "'" + str(m2) + "'" + xpathstr22).extract()
-            #         div_info[win_divs2[0]] = [ win_divs2[1],win_divs2[2] ]
+        
+        #sectional urls
+        # what happens if cant get sectional URL? Item loader will return null 
+        loader.add_value('sectional_time_url', response.xpath('//div[@class="rowDiv15"]/div[@class="rowDivRight"]/a/@href').extract())
+        # loader.add_value('runnercodes', response.xpath('//table[@class="tableBorder trBgBlue tdAlignC number12 draggable"]//td[@class="tdAlignL font13 fontStyle"][1]/text()').extract())
 
-            #     except:
-            #         div_info[m2] = None
-        # print div_info
- 
-        #WHO WON?
-        _winners = div_info['WIN']
-        _winninghorsenumbers = []
-        _winningdivs = []
-        for i,w in enumerate(_winners):
-            if i%2 ==0: #odd indices are horsenumber, even odds
-            #one winner else DH
-                _winninghorsenumbers.append(w)
-            if i%2 ==1:
-                _winningdivs.append(w)
-        ##RUNNERS
+
+        #GRAY = EVEN
+
+        horseloader = HorseItemLoader(HorseItem())
+
+
+        horsecode_pat = re.compile(r"horseno=(?P<str>.+)")
+    
+        #or collect entire lists
+
+
+
+        for i,row in enumerate(response.xpath("//table[@class='tableBorder trBgBlue tdAlignC number12 draggable']//tr[@class='trBgGrey']")):
+            horsecode = row.xpath('./td[3]/a/@href').extract()[0]
+            place = row.xpath('./td[1]/text()').extract()[0]
+            _horseno= row.xpath("./td[2]/text()").extract()
+            horseno = _horseno[0] if _horseno else 99
+            actualwt = row.xpath('./td[6]//text()').extract()[0]
+            horsewt = row.xpath('./td[7]//text()').extract()[0]
+            draw = row.xpath('./td[8]//text()').extract()[0]
+            lbw = horselengthprocessor(row.xpath('./td[9]//text()').extract()[0])
+            winodds = getodds(row.xpath('./td[12]/text()').extract()[0])
+            finishtime = get_sec(row.xpath('./td[11]/text()').extract()[0])
+            _jockeycode = row.xpath('./td[4]/a/@href').extract()[0]
+            runningpositions = "-".join(row.xpath('./td[10]/table//td//text()').extract())
+            _trainercode = row.xpath('./td[5]/a/@href').extract()[0]
+            jockeycode = re.match(r'^http://www.hkjc.com/english/racing/jockeyprofile.asp?.*jockeycode=(?P<str>[^&]*)(&.*$|$)', _jockeycode).groupdict()['str']
+            trainercode = re.match(r'^http://www.hkjc.com/english/racing/trainerprofile.asp?.*trainercode=(?P<str>[^&]*)(&.*$|$)', _trainercode).groupdict()['str']
+
+            #Identity
+            horseloader.add_value('racedate', datetime.strftime(todaysracedate, "%Y%m%d"))
+            horseloader.add_value('racecoursecode', todaysracecoursecode)
+            horseloader.add_value('racenumber', todaysracenumber)
+            ###horse specific
+            horseloader.add_value('horseno', horseno)
+            horseloader.add_value('horsecode', horsecode)
+            horseloader.add_value('jockeycode', jockeycode)
+            horseloader.add_value('trainercode', trainercode)
+            horseloader.add_value('place', place)
+            horseloader.add_value('finishtime', finishtime)
+            horseloader.add_value('actualwt', actualwt)
+            horseloader.add_value('runningpositions', runningpositions)
+            horseloader.add_value('lbw', lbw)
+            horseloader.add_value('draw', draw)
+            horseloader.add_value('winodds', winodds)
+            horseloader.add_value('horsewt', horsewt)
+
+            logger.info("todaysracedate loop %s" % todaysracedate)
+            logger.info("todaysracecoursecode loop %s" % todaysracecoursecode)
+            logger.info("todaysracenumber loop %s" % todaysracenumber)
+            logger.info("place loop %s" % place)
+            logger.info("horseno loop %s" % horseno)
+            logger.info("horsecode loop %s" % horsecode)
+            logger.info("jockeycode loop %s" % jockeycode)
+            logger.info("trainercode loop %s" % trainercode)
+            logger.info("draw loop %s" % draw)
+            logger.info("lbw loop %s" % lbw)
+            logger.info("runningpositions loop %s" % runningpositions)
+            logger.info("actualwt loop %s" % actualwt)
+            logger.info("horse wt loop %s" % horsewt)
+            logger.info("finishtimeloop %s" % finishtime)
+            logger.info("winodds loop %s" % winodds)
+           
+
+
+        for row in response.xpath("//table[@class='tableBorder trBgBlue tdAlignC number12 draggable']//tr[@class='trBgWhite']"):
+            horsecode = row.xpath('./td[3]/a/@href').extract()[0]
+            place = row.xpath('./td[1]/text()').extract()[0]
+            horseno= row.xpath("./td[2]/text()").extract()
+            _horseno= row.xpath("./td[2]/text()").extract()
+            horseno = _horseno[0] if _horseno else 99
+            actualwt = row.xpath('./td[6]//text()').extract()[0]
+            horsewt = row.xpath('./td[7]//text()').extract()[0]
+            draw = row.xpath('./td[8]//text()').extract()[0]
+            lbw = horselengthprocessor(row.xpath('./td[9]//text()').extract()[0])
+            winodds = getodds(row.xpath('./td[12]/text()').extract()[0])
+            finishtime = get_sec(row.xpath('./td[11]/text()').extract()[0])
+            _jockeycode = row.xpath('./td[4]/a/@href').extract()[0]
+            runningpositions = "-".join(row.xpath('./td[10]/table//td//text()').extract())
+            _trainercode = row.xpath('./td[5]/a/@href').extract()[0]
+            jockeycode = re.match(r'^http://www.hkjc.com/english/racing/jockeyprofile.asp?.*jockeycode=(?P<str>[^&]*)(&.*$|$)', _jockeycode).groupdict()['str']
+            trainercode = re.match(r'^http://www.hkjc.com/english/racing/trainerprofile.asp?.*trainercode=(?P<str>[^&]*)(&.*$|$)', _trainercode).groupdict()['str']
+
+            #Identity
+            horseloader.add_value('racedate', datetime.strftime(todaysracedate, "%Y%m%d"))
+            horseloader.add_value('racecoursecode', todaysracecoursecode)
+            horseloader.add_value('racenumber', todaysracenumber)
+            ###horse specific
+            horseloader.add_value('horseno', horseno)
+            horseloader.add_value('horsecode', horsecode)
+            horseloader.add_value('jockeycode', jockeycode)
+            horseloader.add_value('trainercode', trainercode)
+            horseloader.add_value('place', place)
+            horseloader.add_value('finishtime', finishtime)
+            horseloader.add_value('actualwt', actualwt)
+            horseloader.add_value('runningpositions', runningpositions)
+            horseloader.add_value('lbw', lbw)
+            horseloader.add_value('draw', draw)
+            horseloader.add_value('winodds', winodds)
+            horseloader.add_value('horsewt', horsewt)
+
+            logger.info("todaysracedate loop %s" % todaysracedate)
+            logger.info("todaysracecoursecode loop %s" % todaysracecoursecode)
+            logger.info("todaysracenumber loop %s" % todaysracenumber)
+            logger.info("place loop %s" % place)
+            logger.info("horseno loop %s" % horseno)
+            logger.info("horsecode loop %s" % horsecode)
+            logger.info("jockeycode loop %s" % jockeycode)
+            logger.info("trainercode loop %s" % trainercode)
+            logger.info("draw loop %s" % draw)
+            logger.info("lbw loop %s" % lbw)
+            logger.info("runningpositions loop %s" % runningpositions)
+            logger.info("actualwt loop %s" % actualwt)
+            logger.info("horse wt loop %s" % horsewt)
+            logger.info("finishtimeloop %s" % finishtime)
+            logger.info("winodds loop %s" % winodds)
+         
+
         logger.info(div_info)
 
         loader.add_value('win_combo_div', div_info['WIN'])
@@ -201,3 +341,4 @@ class HkjcresSpider(scrapy.Spider):
         #     loader.add_xpath('desc', 'text()')
         # return item
         yield loader.load_item()
+        yield horseloader.load_item()

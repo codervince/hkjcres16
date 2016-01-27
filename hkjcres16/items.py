@@ -8,6 +8,23 @@
 import scrapy
 
 
+class HorseItem(scrapy.Item):
+    racecoursecode= scrapy.Field()
+    racenumber= scrapy.Field()
+    racedate = scrapy.Field()
+    horseno = scrapy.Field()
+    place = scrapy.Field()
+    finishtime = scrapy.Field()
+    horsecode = scrapy.Field()
+    runningpositions= scrapy.Field()
+    actualwt= scrapy.Field()
+    jockeycode = scrapy.Field()
+    trainercode= scrapy.Field()
+    lbw= scrapy.Field()
+    horsewt= scrapy.Field()
+    winodds = scrapy.Field()
+    draw = scrapy.Field()
+
 class Hkjcres16Item(scrapy.Item):
     # define the fields for your item here like:
     # name = scrapy.Field()
@@ -46,3 +63,4 @@ class Hkjcres16Item(scrapy.Item):
     a1_div= scrapy.Field()
     a2_div= scrapy.Field()
     a3_div= scrapy.Field()
+    sectional_time_url = scrapy.Field()
