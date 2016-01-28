@@ -31,11 +31,11 @@ def dorunningpositions(l):
 
 class HorseItemLoader(ItemLoader):
     #default_output_processor = TakeFirst()
-    place_out = Join()
-    actualwt_out = Join()
+    # place_out = Join()
+    # actualwt_out = Join()
     
-    runningpositions_out = Compose(dorunningpositions)
-     
+    #runningpositions_out = Compose(dorunningpositions)
+     pass
 
 class RaceItemLoader(ItemLoader):
     default_output_processor = TakeFirst()
@@ -103,8 +103,8 @@ class HkjcresSpider(scrapy.Spider):
     def parse(self, response):
         logger.info('A response from %s just arrived!', response.url)
         loader = RaceItemLoader(Hkjcres16Item(), response=response)
-        item = Hkjcres16Item()      
-        
+        item = Hkjcres16Item()
+
         if int(response.url.split('/')[-1]) > 9:
             todaysracenumber = '{}'.format(response.url.split('/')[-1])
         else:
@@ -117,7 +117,7 @@ class HkjcresSpider(scrapy.Spider):
         raceindex_path = re.compile(r'\((\d+)\)')
         item['raceindex'] = response.selector.xpath('//div[@class="boldFont14 color_white trBgBlue"]//text()').re(r'\((\d+)\)')
         loader.add_value('raceindex', response.selector.xpath('//div[@class="boldFont14 color_white trBgBlue"]//text()').re(r'\((\d+)\)'))
-        
+
         #race details table
         newraceinfo = response.xpath('//table[@class ="tableBorder0 font13"]//*[self::td or self::td/span]//text()').extract()
 
@@ -146,10 +146,10 @@ class HkjcresSpider(scrapy.Spider):
         loader.add_value('going', going)
 
         #DIVIDEND TABLE
-        markets = [ 'WIN', 'PLACE', 'QUINELLA', 'QUINELLA PLACE', 'TIERCE', 'TRIO', 'FIRST 4', 'QUARTET','9TH DOUBLE', 'TREBLE', 
+        markets = [ 'WIN', 'PLACE', 'QUINELLA', 'QUINELLA PLACE', 'TIERCE', 'TRIO', 'FIRST 4', 'QUARTET','9TH DOUBLE', 'TREBLE',
             '3RD DOUBLE TRIO' , 'SIX UP', 'JOCKEY CHALLENGE',
-            '8TH DOUBLE', '8TH DOUBLE', '2ND DOUBLE TRIO', '6TH DOUBLE', 'TRIPLE TRIO(Consolation)', 
-            'TRIPLE TRIO', '5TH DOUBLE', 
+            '8TH DOUBLE', '8TH DOUBLE', '2ND DOUBLE TRIO', '6TH DOUBLE', 'TRIPLE TRIO(Consolation)',
+            'TRIPLE TRIO', '5TH DOUBLE',
             '5TH DOUBLE', '1ST DOUBLE TRIO', '3RD DOUBLE' ,
             '2ND DOUBLE', '1ST DOUBLE']
         markets2 = ['A1', 'A2', 'A3']
@@ -163,7 +163,7 @@ class HkjcresSpider(scrapy.Spider):
                     xpathstr = str("//tr[td/text() = 'Dividend']/following-sibling::tr[td/text()=")
                     xpathstr2 = str("]/td/text()")
                     win_divs =response.xpath(xpathstr + "'" + str(m) + "'" + xpathstr2).extract()
-                    div_info[win_divs[0]] = [ win_divs[1],win_divs[2] ] 
+                    div_info[win_divs[0]] = [ win_divs[1],win_divs[2] ]
                     # print response.meta['racenumber']
                 except:
                     div_info[m] = None
@@ -179,25 +179,64 @@ class HkjcresSpider(scrapy.Spider):
             div_info['A1'] = response.xpath("//tr[td/text() = 'Dividend']/following-sibling::tr/td[text()='A1']/following-sibling::td/text()").extract()
             div_info['A2'] = response.xpath("//tr[td/text() = 'Dividend']/following-sibling::tr/td[text()='A2']/following-sibling::td/text()").extract()
             div_info['A3'] = response.xpath("//tr[td/text() = 'Dividend']/following-sibling::tr/td[text()='A3']/following-sibling::td/text()").extract()
-        
+
         #sectional urls
-        # what happens if cant get sectional URL? Item loader will return null 
+        # what happens if cant get sectional URL? Item loader will return null
         loader.add_value('sectional_time_url', response.xpath('//div[@class="rowDiv15"]/div[@class="rowDivRight"]/a/@href').extract())
         # loader.add_value('runnercodes', response.xpath('//table[@class="tableBorder trBgBlue tdAlignC number12 draggable"]//td[@class="tdAlignL font13 fontStyle"][1]/text()').extract())
 
 
         #GRAY = EVEN
 
-        horseloader = HorseItemLoader(HorseItem())
-
-
         horsecode_pat = re.compile(r"horseno=(?P<str>.+)")
-    
+
         #or collect entire lists
 
+        logger.info(div_info)
+
+        loader.add_value('win_combo_div', div_info['WIN'])
+        loader.add_value('place_combo_div', div_info['PLACE'])
+        loader.add_value('qn_combo_div' , div_info['QUINELLA'])
+        loader.add_value('qnp_combo_div' , div_info['QUINELLA PLACE'])
+        loader.add_value('tce_combo_div' , div_info['TIERCE'])
+        loader.add_value('trio_combo_div' , div_info['TRIO'])
+        loader.add_value('f4_combo_div' , div_info['FIRST 4'])
+        loader.add_value('qtt_combo_div' , div_info['QUARTET'])
+        loader.add_value('dbl9_combo_div' , div_info['9TH DOUBLE'])
+        loader.add_value('dbl8_combo_div' , div_info['8TH DOUBLE'])
+        loader.add_value('dbl7_combo_div' , div_info['7TH DOUBLE'])
+        loader.add_value('dbl6_combo_div' , div_info['6TH DOUBLE'])
+        loader.add_value('dbl5_combo_div' , div_info['5TH DOUBLE'])
+        loader.add_value('dbl4_combo_div' , div_info['4TH DOUBLE'])
+        loader.add_value('dbl3_combo_div' , div_info['3RD DOUBLE'])
+        loader.add_value('dbl2_combo_div' , div_info['2ND DOUBLE'])
+        loader.add_value('dbl1_combo_div' , div_info['1ST DOUBLE'])
+        loader.add_value('dbl10_combo_div' , div_info['10TH DOUBLE'])
+        loader.add_value('dbltrio1_combo_div' , div_info['1ST DOUBLE TRIO'])
+        loader.add_value('dbltrio2_combo_div' , div_info['2ND DOUBLE TRIO'])
+        loader.add_value('dbltrio3_combo_div' , div_info['3RD DOUBLE TRIO'])
+        loader.add_value('tripletriocons_combo_div' , div_info['TRIPLE TRIO(Consolation)'])
+        loader.add_value('tripletrio_combo_div', div_info['TRIPLE TRIO'])
+        loader.add_value('a1_div', div_info['A1'])
+        loader.add_value('a2_div', div_info['A2'])
+        loader.add_value('a3_div', div_info['A3'])
+        loader.add_value('sixup_combo_div', div_info['SIX UP'])
+        loader.add_value('jockeychallenge_combo_div', div_info['JOCKEY CHALLENGE'])
+        # sectional_time_url_ = response.xpath('//div[@class="rowDiv15"]/div[@class="rowDivRight"]/a[@href]').extract()
+        # for sel in response.xpath('//ul/li'):
+        #
+        #     loader.add_xpath('title', 'a/text()')
+        #     loader.add_xpath('link', 'a/@href')
+        #     loader.add_xpath('desc', 'text()')
+        # return item
+
+        hkjcres16_item = loader.load_item()
 
 
         for i,row in enumerate(response.xpath("//table[@class='tableBorder trBgBlue tdAlignC number12 draggable']//tr[@class='trBgGrey']")):
+            horseloader = HorseItemLoader(HorseItem())
+            horseloader.add_value('hkjcres16_item', hkjcres16_item)
+
             horsecode = row.xpath('./td[3]/a/@href').extract()[0]
             place = row.xpath('./td[1]/text()').extract()[0]
             _horseno= row.xpath("./td[2]/text()").extract()
@@ -247,10 +286,17 @@ class HkjcresSpider(scrapy.Spider):
             logger.info("horse wt loop %s" % horsewt)
             logger.info("finishtimeloop %s" % finishtime)
             logger.info("winodds loop %s" % winodds)
-           
+
+            # horseitem = horseloader.load_item()
+            # horseitem['hkjcres16_item'] = hkjcres16_item
+            # yield horseitem
+            yield horseloader.load_item()
 
 
         for row in response.xpath("//table[@class='tableBorder trBgBlue tdAlignC number12 draggable']//tr[@class='trBgWhite']"):
+            horseloader = HorseItemLoader(HorseItem())
+            horseloader.add_value('hkjcres16_item', hkjcres16_item)
+
             horsecode = row.xpath('./td[3]/a/@href').extract()[0]
             place = row.xpath('./td[1]/text()').extract()[0]
             horseno= row.xpath("./td[2]/text()").extract()
@@ -301,44 +347,8 @@ class HkjcresSpider(scrapy.Spider):
             logger.info("horse wt loop %s" % horsewt)
             logger.info("finishtimeloop %s" % finishtime)
             logger.info("winodds loop %s" % winodds)
-         
 
-        logger.info(div_info)
-
-        loader.add_value('win_combo_div', div_info['WIN'])
-        loader.add_value('place_combo_div', div_info['PLACE'])
-        loader.add_value('qn_combo_div' , div_info['QUINELLA'])
-        loader.add_value('qnp_combo_div' , div_info['QUINELLA PLACE'])
-        loader.add_value('tce_combo_div' , div_info['TIERCE'])
-        loader.add_value('trio_combo_div' , div_info['TRIO'])
-        loader.add_value('f4_combo_div' , div_info['FIRST 4'])
-        loader.add_value('qtt_combo_div' , div_info['QUARTET'])
-        loader.add_value('dbl9_combo_div' , div_info['9TH DOUBLE'])
-        loader.add_value('dbl8_combo_div' , div_info['8TH DOUBLE'])
-        loader.add_value('dbl7_combo_div' , div_info['7TH DOUBLE'])
-        loader.add_value('dbl6_combo_div' , div_info['6TH DOUBLE'])
-        loader.add_value('dbl5_combo_div' , div_info['5TH DOUBLE'])
-        loader.add_value('dbl4_combo_div' , div_info['4TH DOUBLE'])
-        loader.add_value('dbl3_combo_div' , div_info['3RD DOUBLE'])
-        loader.add_value('dbl2_combo_div' , div_info['2ND DOUBLE'])
-        loader.add_value('dbl1_combo_div' , div_info['1ST DOUBLE'])
-        loader.add_value('dbl10_combo_div' , div_info['10TH DOUBLE'])
-        loader.add_value('dbltrio1_combo_div' , div_info['1ST DOUBLE TRIO'])
-        loader.add_value('dbltrio2_combo_div' , div_info['2ND DOUBLE TRIO'])
-        loader.add_value('dbltrio3_combo_div' , div_info['3RD DOUBLE TRIO'])
-        loader.add_value('tripletriocons_combo_div' , div_info['TRIPLE TRIO(Consolation)'])
-        loader.add_value('tripletrio_combo_div', div_info['TRIPLE TRIO'])
-        loader.add_value('a1_div', div_info['A1'])
-        loader.add_value('a2_div', div_info['A2'])
-        loader.add_value('a3_div', div_info['A3'])
-        loader.add_value('sixup_combo_div', div_info['SIX UP'])
-        loader.add_value('jockeychallenge_combo_div', div_info['JOCKEY CHALLENGE'])
-        # sectional_time_url_ = response.xpath('//div[@class="rowDiv15"]/div[@class="rowDivRight"]/a[@href]').extract()
-        # for sel in response.xpath('//ul/li'):
-        #     
-        #     loader.add_xpath('title', 'a/text()')
-        #     loader.add_xpath('link', 'a/@href')
-        #     loader.add_xpath('desc', 'text()')
-        # return item
-        yield loader.load_item()
-        yield horseloader.load_item()
+            # horseitem = horseloader.load_item()
+            # horseitem['hkjcres16_item'] = hkjcres16_item
+            # yield horseitem
+            yield horseloader.load_item()
