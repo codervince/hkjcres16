@@ -1,0 +1,1 @@
+(pyscrapy)vmacs-MacBook-Pro:hkjcres16 vmac$ scrapy crawl hkjcres -o output5.csv -t csv

@@ -25,8 +25,11 @@ class HorseItem(scrapy.Item):
     lbw = scrapy.Field()
     horsewt = scrapy.Field()
     winodds = scrapy.Field()
+    winoddsrank = scrapy.Field()
+    todaysrunners= scrapy.Field()
+    timeperm = scrapy.Field()
     draw = scrapy.Field()
-
+    horsereport = scrapy.Field()
 
 class Hkjcres16Item(scrapy.Item):
     # define the fields for your item here like:
