@@ -11,12 +11,13 @@ ____________
 
 Here's some code from an earlier version (in this case all the fields weer combined into a single item)
 
-  logger.info("This is meta_Dict in parse race {}".format(meta_dict))
+      
+    logger.info("This is meta_Dict in parse race {}".format(meta_dict))
         request.meta.update(meta_dict)
         yield request
 
 
- def parse_sectional_time(self, response):      
+    def parse_sectional_time(self, response):      
         '''
         horsenumber, horsename, horsecode
         marginsbehindleader = db.Column(postgresql.ARRAY(Float)) #floats
