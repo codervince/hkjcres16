@@ -244,6 +244,9 @@ class HkjcresSpider(scrapy.Spider):
         # return item
 
         hkjcres16_item = loader.load_item()
+
+        horse_items = []
+
         ## winodds, lbw, finishtime
         agg_winodds = OrderedDict()
 
@@ -289,12 +292,12 @@ class HkjcresSpider(scrapy.Spider):
             horseloader.add_value('jockeycode', jockeycode)
             horseloader.add_value('trainercode', trainercode)
             horseloader.add_value('place', place)
-            horseloader.add_value('finishtime', finishtime)
+            horseloader.add_value('finishtime', str(finishtime))
             horseloader.add_value('actualwt', actualwt)
             horseloader.add_value('runningpositions', runningpositions)
-            horseloader.add_value('lbw', lbw)
+            horseloader.add_value('lbw', str(lbw))
             horseloader.add_value('draw', draw)
-            horseloader.add_value('winodds', winodds)
+            horseloader.add_value('winodds', str(winodds))
             horseloader.add_value('horsewt', horsewt)
 
             logger.info("todaysracedate loop %s" % todaysracedate_str)
@@ -314,11 +317,7 @@ class HkjcresSpider(scrapy.Spider):
             logger.info("winodds loop %s" % winodds)
             logger.info("ttdiv consdiv loop %s- %s" % (ttdiv, ttconsdiv))
 
-
-            # horseitem = horseloader.load_item()
-            # horseitem['hkjcres16_item'] = hkjcres16_item
-            # yield horseitem
-            yield horseloader.load_item()
+            horse_items += [horseloader.load_item()]
 
 
         for row in response.xpath("//table[@class='tableBorder trBgBlue tdAlignC number12 draggable']//tr[@class='trBgWhite']"):
@@ -375,12 +374,12 @@ class HkjcresSpider(scrapy.Spider):
             horseloader.add_value('jockeycode', jockeycode)
             horseloader.add_value('trainercode', trainercode)
             horseloader.add_value('place', place)
-            horseloader.add_value('finishtime', finishtime)
+            horseloader.add_value('finishtime', str(finishtime))
             horseloader.add_value('actualwt', actualwt)
             horseloader.add_value('runningpositions', runningpositions)
-            horseloader.add_value('lbw', lbw)
+            horseloader.add_value('lbw', str(lbw))
             horseloader.add_value('draw', draw)
-            horseloader.add_value('winodds', winodds)
+            horseloader.add_value('winodds', str(winodds))
             horseloader.add_value('winoddsrank', winoddsrank)
             horseloader.add_value('todaysrunners', todaysrunners)
             horseloader.add_value('horsewt', horsewt)
@@ -406,7 +405,48 @@ class HkjcresSpider(scrapy.Spider):
             logger.info("winoddsrank %s-%s" % (horsecode, winoddsrank))
             logger.info("Time per m %s" % gettimeperlength(racedistance, finishtime))
             logger.info("horsereport %s -> %s: %s" % (horsecode, horsename, horsereport))
-            # horseitem = horseloader.load_item()
-            # horseitem['hkjcres16_item'] = hkjcres16_item
-            # yield horseitem
-            yield horseloader.load_item()
+
+            horse_items += [horseloader.load_item()]
+
+        yield scrapy.Request(
+            hkjcres16_item['sectional_time_url'],
+            self.parse_sectional_time,
+            dont_filter=True, meta={
+                # 'hkjcres16_item': hkjcres16_item,
+                'horse_items': horse_items,
+            })
+
+    def parse_sectional_time(self, response):
+        horse_lines_selector = response.xpath('//table[@class="bigborder"]//table//a/../../..')
+        sectional_time_selector = response.xpath('//table[@class="bigborder"]//table//a/../../../following-sibling::tr[1]')
+
+        horse_items = response.meta['horse_items']
+
+        for line_selector, time_selector in zip(horse_lines_selector, sectional_time_selector):
+            horse_name_cell = line_selector.xpath('td[3]/div/a/text()').extract()[0]
+            horse_name_regexp = '^(?P<name>[^\(]+)\((?P<code>[^\)]+)\)$'
+            horse_name_dict = re.match(horse_name_regexp, horse_name_cell).groupdict()
+            horsename = horse_name_dict['name']
+            horsecode = horse_name_dict['code']
+
+            sec_timelist = [time.strip() for time in time_selector.xpath('td/text()').extract()]
+            sec_timelist_len = len(sec_timelist)
+            sec_timelist.extend([None for i in xrange(6-sec_timelist_len)])
+            sec_timelist = map(get_sec_in_secs, sec_timelist)
+
+            marginsbehindleader = [s.strip('\t\n\r ') for s in line_selector.xpath('td//table//td/text()').extract()]
+            marginsbehindleader.extend([None]*(6 - len(marginsbehindleader)))
+            marginsbehindleader = map(horselengthprocessor, marginsbehindleader)
+
+            for horse in horse_items:
+                if horse['horsecode'][0] == horsecode:
+                    logger.info(horsecode)
+                    horse['sec_timelist'] = sec_timelist
+                    horse['marginsbehindleader'] = marginsbehindleader
+                    break
+            else:
+                logger.info('Horse with code %s not found', horsecode)
+                logger.info('%s', horse_items)
+
+        for horse in horse_items:
+            yield horse

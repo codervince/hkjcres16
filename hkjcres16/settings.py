@@ -92,4 +92,6 @@ CSV_EXPORT_PIPELINE_FIELDS = [
     'HorseItem__horsewt',
     'HorseItem__winodds',
     'HorseItem__draw',
+    'HorseItem__sec_timelist',
+    'HorseItem__marginsbehindleader',
 ]

@@ -31,6 +31,10 @@ class HorseItem(scrapy.Item):
     draw = scrapy.Field()
     horsereport = scrapy.Field()
 
+    sec_timelist = scrapy.Field()
+    marginsbehindleader = scrapy.Field()
+
+
 class Hkjcres16Item(scrapy.Item):
     # define the fields for your item here like:
     # name = scrapy.Field()
