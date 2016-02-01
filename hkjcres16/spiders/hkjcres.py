@@ -394,10 +394,10 @@ class HkjcresSpider(scrapy.Spider):
             horseloader.add_value('lbw', str(lbw))
             horseloader.add_value('draw', draw)
             horseloader.add_value('winodds', str(winodds))
-            horseloader.add_value('winoddsrank', winoddsrank)
+            horseloader.add_value('winoddsrank', str(winoddsrank))
             horseloader.add_value('todaysrunners', todaysrunners)
             horseloader.add_value('horsewt', horsewt)
-            horseloader.add_value('timeperm', gettimeperlength(racedistance, finishtime))
+            horseloader.add_value('timeperm', str(gettimeperlength(racedistance, finishtime)))
             horseloader.add_value('horsereport', horsereport)
 
 
