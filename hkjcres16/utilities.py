@@ -440,7 +440,7 @@ def gettimeperlength(d, ft):
         ft = try_float(ft)
         if ft is not None and ft != 0.0:
             ls = float(d)/HORSE_LENGTH #number of lengths
-            return round(ft/ls,4)
+            return round(ft/ls),4)*100.0
     except ValueError,TypeError:
         return None
 

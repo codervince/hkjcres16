@@ -33,6 +33,7 @@ class HorseItem(scrapy.Item):
 
     sec_timelist = scrapy.Field()
     marginsbehindleader = scrapy.Field()
+    secfinishtime = scrapy.Field()
 
 
 class Hkjcres16Item(scrapy.Item):

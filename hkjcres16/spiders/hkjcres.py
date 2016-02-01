@@ -78,10 +78,11 @@ class HkjcresSpider(scrapy.Spider):
     allowed_domains = ["racing.hkjc.com"]
 
 
+    #input.csv
     def __init__(self, input_filename='input.csv', *args, **kwargs):
         super(HkjcresSpider, self).__init__(*args, **kwargs)
 
-        with open(input_filename, 'r') as f:
+        with open(input_filename, 'rU') as f:
             self.input_data = list(csv.DictReader(f, skipinitialspace=True))
 
         self.base_url = "http://racing.hkjc.com/racing/Info/Meeting/Results/English/Local/"
@@ -186,11 +187,23 @@ class HkjcresSpider(scrapy.Spider):
         ttdiv = None
         ttconsdiv = None
         if div_info['TRIPLE TRIO']:
-            ttdiv_ = div_info['TRIPLE TRIO'][0].split(" ")[-1]
-            ttdiv= float(ttdiv_.replace(',',''))
+            ## cannot always split like this
+            pat = re.compile(r".+\s([0-9]+,[0-9]+,[0-9]+.00)")
+            try:
+                ttdiv= re.match(pat,div_info['TRIPLE TRIO'] ).group(0)
+            except AttributeError, ValueError:
+                ttdiv = div_info['TRIPLE TRIO']
+                #ttdiv_ = div_info['TRIPLE TRIO'][0].split(" ")[-1]
+            # valueerrir ttdiv= float(ttdiv_.replace(',','')) e.g. 
+            ## ttdiv= float(ttdiv_.replace(',',''))
+            ## ValueError: invalid literal for float(): 31114/4714/129
+            ## 3,11,14/4,7,14/1,2,9 17,438,530.00
+
         if div_info['TRIPLE TRIO(Consolation)']:
-            ttconsdiv_ = div_info['TRIPLE TRIO(Consolation)'][0].split(" ")[-1]
-            ttconsdiv= float(ttdiv_.replace(',',''))
+            try:
+                ttconsdiv= re.match(pat,div_info['TRIPLE TRIO(Consolation)'] ).group(0)
+            except AttributeError, ValueError:
+                ttconsdiv = div_info['TRIPLE TRIO(Consolation)']
         #sectional urls
         # what happens if cant get sectional URL? Item loader will return null
         loader.add_value('sectional_time_url', response.xpath('//div[@class="rowDiv15"]/div[@class="rowDivRight"]/a/@href').extract())
@@ -362,7 +375,8 @@ class HkjcresSpider(scrapy.Spider):
             #agg functions
             winodds_d = OrderedDict(sorted(agg_winodds.items(), key=lambda t: t[0]))
             winoddsranks = OrderedDict(sorted(winodds_d.items(), key=lambda t: t[1]))
-            winoddsrank = list(winoddsranks.keys()).index(horsecode)+1 #index at 0
+            winoddsrank = list(winoddsranks.keys()).index(horsecode) #index at 0
+            winoddsrank +=1
             todaysrunners = list(winoddsranks.keys())
             #Unique Race Identity
             horseloader.add_value('racedate', todaysracedate_str)
@@ -428,6 +442,8 @@ class HkjcresSpider(scrapy.Spider):
             horse_name_dict = re.match(horse_name_regexp, horse_name_cell).groupdict()
             horsename = horse_name_dict['name']
             horsecode = horse_name_dict['code']
+            
+            secfinishtime = line_selector.xpath('/td[10]/div/text()').extract()[0]
 
             sec_timelist = [time.strip() for time in time_selector.xpath('td/text()').extract()]
             sec_timelist_len = len(sec_timelist)
@@ -443,6 +459,7 @@ class HkjcresSpider(scrapy.Spider):
                     logger.info(horsecode)
                     horse['sec_timelist'] = sec_timelist
                     horse['marginsbehindleader'] = marginsbehindleader
+                    horse['secfinishtime'] = secfinishtime
                     break
             else:
                 logger.info('Horse with code %s not found', horsecode)
