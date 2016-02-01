@@ -24,6 +24,7 @@ class HorseItem(scrapy.Item):
     trainercode = scrapy.Field()
     lbw = scrapy.Field()
     horsewt = scrapy.Field()
+    jtohweight= scrapy.Field()
     winodds = scrapy.Field()
     winoddsrank = scrapy.Field()
     todaysrunners= scrapy.Field()

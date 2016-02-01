@@ -186,12 +186,13 @@ class HkjcresSpider(scrapy.Spider):
         # 'tripletrio_combo_div': u'1,2>5,10/2,6,10/1,4,8 3,826,375.00'
         ttdiv = None
         ttconsdiv = None
+        pat = re.compile(r".+\s([0-9]+,[0-9]+,[0-9]+.00)")
         if div_info['TRIPLE TRIO']:
             ## cannot always split like this
-            pat = re.compile(r".+\s([0-9]+,[0-9]+,[0-9]+.00)")
+            
             try:
-                ttdiv= re.match(pat,div_info['TRIPLE TRIO'] ).group(0)
-            except AttributeError, ValueError:
+                ttdiv= re.match(pat,div_info['TRIPLE TRIO'][0] ).group(0)
+            except (AttributeError, ValueError, TypeError):
                 ttdiv = div_info['TRIPLE TRIO']
                 #ttdiv_ = div_info['TRIPLE TRIO'][0].split(" ")[-1]
             # valueerrir ttdiv= float(ttdiv_.replace(',','')) e.g. 
@@ -201,8 +202,8 @@ class HkjcresSpider(scrapy.Spider):
 
         if div_info['TRIPLE TRIO(Consolation)']:
             try:
-                ttconsdiv= re.match(pat,div_info['TRIPLE TRIO(Consolation)'] ).group(0)
-            except AttributeError, ValueError:
+                ttconsdiv= re.match(pat,div_info['TRIPLE TRIO(Consolation)'][0] ).group(0)
+            except (AttributeError, ValueError, TypeError):
                 ttconsdiv = div_info['TRIPLE TRIO(Consolation)']
         #sectional urls
         # what happens if cant get sectional URL? Item loader will return null
@@ -269,7 +270,10 @@ class HkjcresSpider(scrapy.Spider):
             horseloader.add_value('hkjcres16_item', hkjcres16_item)
             horsecode = horsecode_pat.findall(row.xpath('./td[3]/a/@href').extract()[0]) or None
             horsename = row.xpath('./td[3]/a/text()').extract()[0]
-            place = row.xpath('./td[1]/text()').extract()[0]
+            if row.xpath('./td[1]/text()').extract():
+                place = row.xpath('./td[1]/text()').extract()[0]
+            else:
+                place = 99
             _horseno= row.xpath("./td[2]/text()").extract()
             horseno = _horseno[0] if _horseno else 99
             actualwt = row.xpath('./td[6]//text()').extract()[0]
@@ -295,6 +299,19 @@ class HkjcresSpider(scrapy.Spider):
                 trainercode = re.match(r'^http://www.hkjc.com/english/racing/trainerprofile.asp?.*trainercode=(?P<str>[^&]*)(&.*$|$)', trainercode).groupdict()['str']
             else:
                 trainercode = None
+
+            #horse report
+            racingincidentreport_ = response.xpath('//tr[td[contains(text(), "Racing Incident Report")]]/following-sibling::tr/td/text()').extract()
+            racingincidentreport = racingincidentreport_ and racingincidentreport_[0]
+            horsereport = getHorseReport(racingincidentreport, horsename)
+
+            #agg functions
+            winodds_d = OrderedDict(sorted(agg_winodds.items(), key=lambda t: t[0]))
+            winoddsranks = OrderedDict(sorted(winodds_d.items(), key=lambda t: t[1]))
+            winoddsrank = list(winoddsranks.keys()).index(horsecode) #index at 0
+            winoddsrank +=1
+            todaysrunners = list(winoddsranks.keys()) #how to get each horse having all 
+            
             #Identity
             horseloader.add_value('racedate', todaysracedate_str)
             horseloader.add_value('racecoursecode', todaysracecoursecode)
@@ -312,6 +329,10 @@ class HkjcresSpider(scrapy.Spider):
             horseloader.add_value('draw', draw)
             horseloader.add_value('winodds', str(winodds))
             horseloader.add_value('horsewt', horsewt)
+            horseloader.add_value('winoddsrank', str(winoddsrank))
+            horseloader.add_value('todaysrunners', todaysrunners)
+            horseloader.add_value('timeperm', str(gettimeperlength(racedistance, finishtime)))
+            horseloader.add_value('horsereport', horsereport)
 
             logger.info("todaysracedate loop %s" % todaysracedate_str)
             logger.info("todaysracecoursecode loop %s" % todaysracecoursecode)
@@ -326,6 +347,7 @@ class HkjcresSpider(scrapy.Spider):
             logger.info("runningpositions loop %s" % runningpositions)
             logger.info("actualwt loop %s" % actualwt)
             logger.info("horse wt loop %s" % horsewt)
+            logger.info("jtohweight loop %s" % getjtohweight(actualwt, horsewt))
             logger.info("finishtimeloop %s" % finishtime)
             logger.info("winodds loop %s" % winodds)
             logger.info("ttdiv consdiv loop %s- %s" % (ttdiv, ttconsdiv))
@@ -339,7 +361,10 @@ class HkjcresSpider(scrapy.Spider):
 
             horsecode = horsecode_pat.findall(row.xpath('./td[3]/a/@href').extract()[0]) or None
             horsename = row.xpath('./td[3]/a/text()').extract()[0]
-            place = row.xpath('./td[1]/text()').extract()[0]
+            if row.xpath('./td[1]/text()').extract():
+                place = row.xpath('./td[1]/text()').extract()[0]
+            else:
+                place = 99
             horseno= row.xpath("./td[2]/text()").extract()
             _horseno= row.xpath("./td[2]/text()").extract()
             horseno = _horseno[0] if _horseno else 99
@@ -397,6 +422,7 @@ class HkjcresSpider(scrapy.Spider):
             horseloader.add_value('winoddsrank', str(winoddsrank))
             horseloader.add_value('todaysrunners', todaysrunners)
             horseloader.add_value('horsewt', horsewt)
+
             horseloader.add_value('timeperm', str(gettimeperlength(racedistance, finishtime)))
             horseloader.add_value('horsereport', horsereport)
 
@@ -414,6 +440,7 @@ class HkjcresSpider(scrapy.Spider):
             logger.info("runningpositions loop %s" % runningpositions)
             logger.info("actualwt loop %s" % actualwt)
             logger.info("horse wt loop %s" % horsewt)
+            logger.info("jtohweight loop %s" % getjtohweight(actualwt, horsewt))
             logger.info("finishtimeloop %s" % finishtime)
             logger.info("winodds loop %s" % winodds)
             logger.info("winoddsrank %s-%s" % (horsecode, winoddsrank))
@@ -443,7 +470,7 @@ class HkjcresSpider(scrapy.Spider):
             horsename = horse_name_dict['name']
             horsecode = horse_name_dict['code']
             
-            secfinishtime = line_selector.xpath('/td[10]/div/text()').extract()[0]
+            secfinishtime = line_selector.xpath('td[10]/div/text()').extract()[0]
 
             sec_timelist = [time.strip() for time in time_selector.xpath('td/text()').extract()]
             sec_timelist_len = len(sec_timelist)

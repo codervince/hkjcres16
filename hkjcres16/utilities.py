@@ -7,6 +7,45 @@ import operator
 import math
 
 
+# calculate lengthadjustmentdue to wide running from horse report
+
+# enter nwide 1,2,3,4, 5, 6, 7, rc
+# add each time mentioned in horsereport
+def getwidelengthadjustment(nw, rc):
+    if nw == 1:
+        return 0
+    if rc == 'ST':
+        return {
+        2: 0.75,
+        3:1.5,
+        4:2.25,
+        5:3,
+        6:3.75,
+        7:4.5
+        }.get(nw, None) 
+    if rc == 'HV':
+        return {
+        2: 0.5,
+        3: 1.0,
+        4: 1.5,
+        5: 2.0,
+        6: 2.5,
+        7:3.0
+        }.get(nw, None) 
+
+def getjtohweight(actualwt, horsewt):
+    ##guards
+    if actualwt == '-' or horsewt == '-':
+        return None
+    else:
+        try:
+            aw = try_float(actualwt)
+            hw = try_float(horsewt)
+            rtn = (aw/hw)*100
+            return round(rtn,2)
+        except:
+            return None
+
 
 ##SCMP
 
@@ -440,7 +479,8 @@ def gettimeperlength(d, ft):
         ft = try_float(ft)
         if ft is not None and ft != 0.0:
             ls = float(d)/HORSE_LENGTH #number of lengths
-            return round(ft/ls),4)*100.0
+            rd = round(ft/ls,4)
+            return rd*100.0
     except ValueError,TypeError:
         return None
 
