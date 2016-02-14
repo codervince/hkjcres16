@@ -1,0 +1,7 @@
+code, name, yob, hkjcsince, championships,notes
+'FC', 'Caspar Fowns', 1968,2003,[2007,2009,2014],"cousin of WS"
+'SJJ', 'John Size', 1955, 2001, [2002,2003,2004,2006,2008, 2010, 2012]
+'SCS', 'C S Shum', 1961, 2003,[]
+'WS', 'Shawn Woods',1966,2002, [], "cousin of FC"
+'JM', 'John Moore', 1959,1985, [1986,1991,1993,1995,2011,2015]
+'MKL', 'K L Man/Manfred Man Ka-Leung',1968,2001, [], "former assistant Trainer to JM, former HKJC jockey"

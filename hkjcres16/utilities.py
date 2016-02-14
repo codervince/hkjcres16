@@ -6,6 +6,25 @@ import re
 import operator
 import math
 
+def getnethorseprize(place, prize):
+    entry = prize*0.03
+    factor= {
+    '1': 0.57,
+    '2': 0.22,
+    '3': 0.115,
+    '4': 0.06,
+    }.get(place, 0.0)
+    return (factor*prize) - entry
+
+
+def testregex(pat,s):
+    return re.match(pat, s)
+
+def runregex(pat, s):
+    s= s.strip()
+    if testregex(pat, s):
+        return re.match(pat, s).group(1)
+
 
 # calculate lengthadjustmentdue to wide running from horse report
 

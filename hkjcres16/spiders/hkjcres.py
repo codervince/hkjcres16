@@ -7,13 +7,19 @@ from collections import defaultdict,OrderedDict, Counter
 #from selenium import webdriver
 #from time import sleep
 import urllib
+import pandas as pd
 import re
 import logging
 import csv
 from datetime import datetime
 import itertools
 from hkjcres16.utilities import *
+import pprint
 
+
+#600,000 1,500,000
+raceprize_pat = re.compile("\D*HK$(\d{0,1}\,\d{3}\,\d{3}).*")
+horsecode_pat = re.compile(r"horseno=(?P<str>.+)")
 
 class DefaultListOrderedDict(OrderedDict):
     def __missing__(self,k):
@@ -29,13 +35,17 @@ def timetofloat(t):
 def dorunningpositions(l):
     return "-".join(l)
 
+
+## TODO: change to map to RP Scraper
 class HorseItemLoader(ItemLoader):
+    default_output_processor = TakeFirst()
     #default_output_processor = TakeFirst()
+    hkjcres16_item_in = Identity()
+    hkjcres16_item_out = Identity()
     # place_out = Join()
     # actualwt_out = Join()
     
     #runningpositions_out = Compose(dorunningpositions)
-     pass
 
 class RaceItemLoader(ItemLoader):
     default_output_processor = TakeFirst()
@@ -141,6 +151,12 @@ class HkjcresSpider(scrapy.Spider):
         newsectionaltimes = response.xpath('//table[@class ="tableBorder0 font13"]//td[text()="Sectional Time :"]/following-sibling::td/text()').extract()
         winningsecs = map(float, newsectionaltimes)
         finishtime = sum(winningsecs)
+
+        raceprize__= " ".join(response.xpath("//table[@class ='tableBorder0 font13']//td[contains(text(),'HK$')]/text()").extract())
+        raceprize_ = raceprize__.replace(",", "").replace("HK$", "")
+        raceprize = pd.np.float( (raceprize_))
+        loader.add_value('raceprize', raceprize)
+
         loader.add_value('raceclass', raceclass)
         loader.add_value('courseconfig', racesurface)
         loader.add_value('racedistance', racedistance)
@@ -215,10 +231,15 @@ class HkjcresSpider(scrapy.Spider):
 
         horsecode_pat = re.compile(r"horseno=(?P<str>.+)")
 
+
         #or collect entire lists
 
         logger.info(div_info)
-
+        # Race.isTT1
+        # isTT2
+        # isTT3
+        # isSIX1
+        # isSIX2 etc
         loader.add_value('win_combo_div', div_info['WIN'])
         loader.add_value('place_combo_div', div_info['PLACE'])
         loader.add_value('qn_combo_div' , div_info['QUINELLA'])
@@ -257,14 +278,27 @@ class HkjcresSpider(scrapy.Spider):
         #     loader.add_xpath('desc', 'text()')
         # return item
 
+
         hkjcres16_item = loader.load_item()
 
         horse_items = []
 
         ## winodds, lbw, finishtime
+        trainerprizes = defaultdict(int)
         agg_winodds = OrderedDict()
 
-        horsecode_pat = re.compile(r"horseno=(?P<str>.+)")
+        trainer_pat = re.compile(r'^http://www.hkjc.com/english/racing/trainerprofile.asp?.*trainercode=(?P<str>[^&]*)(&.*$|$)')
+        allplaces_ = response.xpath("//table[@class='tableBorder trBgBlue tdAlignC number12 draggable']//tr[@class='trBgGrey']//td[1]/text()").extract()[0]
+        allts = response.xpath("//table[@class='tableBorder trBgBlue tdAlignC number12 draggable']//tr[@class='trBgGrey']//td[5]/a/@href").extract()
+        
+        alltcodes = [ re.match(trainer_pat, x).groupdict()['str'] for x in allts if x is not None]
+        trainerprizes.fromkeys(alltcodes)
+        allplaces = [x if int(x) else 99 for x in allplaces_]
+        for p,t in zip(allplaces, alltcodes):
+            trainerprizes[t] += getnethorseprize(p, raceprize)
+
+        pprint.pprint(trainerprizes)
+
         for i,row in enumerate(response.xpath("//table[@class='tableBorder trBgBlue tdAlignC number12 draggable']//tr[@class='trBgGrey']")):
             horseloader = HorseItemLoader(HorseItem())
             horseloader.add_value('hkjcres16_item', hkjcres16_item)
@@ -300,6 +334,9 @@ class HkjcresSpider(scrapy.Spider):
             else:
                 trainercode = None
 
+            horseprize = getnethorseprize(place, raceprize)
+            
+            horseloader.add_value('horseprize', horseprize)
             #horse report
             racingincidentreport_ = response.xpath('//tr[td[contains(text(), "Racing Incident Report")]]/following-sibling::tr/td/text()').extract()
             racingincidentreport = racingincidentreport_ and racingincidentreport_[0]
@@ -377,6 +414,10 @@ class HkjcresSpider(scrapy.Spider):
                 horsecode = horsecode[0]
             agg_winodds[horsecode] = winodds
             finishtime = get_sec(row.xpath('./td[11]/text()').extract()[0])
+            horsetimepermeter = None
+            if finishtime:
+                horsetimepermeter = round( float(racedistance)/float(finishtime), 3)
+            print("horsetimepermeter -->", horsetimepermeter )
             runningpositions = ">".join(row.xpath('./td[10]/table//td//text()').extract())
 
             _jockeycode = row.xpath('./td[4]/a/@href').extract()
@@ -414,16 +455,18 @@ class HkjcresSpider(scrapy.Spider):
             horseloader.add_value('trainercode', trainercode)
             horseloader.add_value('place', place)
             horseloader.add_value('finishtime', str(finishtime))
+            horseloader.add_value('horsetimepermeter', horsetimepermeter)
             horseloader.add_value('actualwt', actualwt)
             horseloader.add_value('runningpositions', runningpositions)
             horseloader.add_value('lbw', str(lbw))
             horseloader.add_value('draw', draw)
             horseloader.add_value('winodds', str(winodds))
+            horseloader.add_value('oddschance', 1/winodds)
             horseloader.add_value('winoddsrank', str(winoddsrank))
             horseloader.add_value('todaysrunners', todaysrunners)
             horseloader.add_value('horsewt', horsewt)
 
-            horseloader.add_value('timeperm', str(gettimeperlength(racedistance, finishtime)))
+            # horseloader.add_value('timeperm', str(gettimeperlength(racedistance, finishtime)))
             horseloader.add_value('horsereport', horsereport)
 
 
@@ -455,13 +498,18 @@ class HkjcresSpider(scrapy.Spider):
             dont_filter=True, meta={
                 # 'hkjcres16_item': hkjcres16_item,
                 'horse_items': horse_items,
+                'trainerprizes': trainerprizes
             })
+
+    # sort out trainerprizes and do parse_horse
 
     def parse_sectional_time(self, response):
         horse_lines_selector = response.xpath('//table[@class="bigborder"]//table//a/../../..')
         sectional_time_selector = response.xpath('//table[@class="bigborder"]//table//a/../../../following-sibling::tr[1]')
 
         horse_items = response.meta['horse_items']
+        trainerprizes = response.meta['trainerprizes']
+        pprint.pprint(trainerprizes)
 
         for line_selector, time_selector in zip(horse_lines_selector, sectional_time_selector):
             horse_name_cell = line_selector.xpath('td[3]/div/a/text()').extract()[0]
