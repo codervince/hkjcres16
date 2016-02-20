@@ -5,6 +5,164 @@ from datetime import date, time, datetime, timedelta
 import re
 import operator
 import math
+from urlparse import urljoin
+import numpy as np
+from fractions import Fraction
+
+from dateutil.relativedelta import relativedelta
+
+def getSR(w, r):
+    if w is None or r is None:
+        return None
+    if r == 0:
+        return None
+    try:
+        w= float(w)
+        r = float(r)
+        return round(w/r,3)*100.0
+    except:
+        return None
+
+def getpoints(pos):
+    return {
+    '1':12,
+    '2':6,
+    '3':4,
+    '4':2
+    }.get(str(pos), 0)
+
+def comparegears(gt, glto):
+    if gt==glto:
+        return "Same"
+    try:
+        return re.sub(r'.*([A-Z]{1,2})1.*', gt)
+    except:
+        return "Same"
+
+def get_prio_val(str):
+    if type(str) != type([]):
+        return try_int(str)
+    if str is None:
+        return []
+    return [int(s) for s in str.split() if s.isdigit()][0]
+
+
+def isscratched(s):
+    return s == 99
+    # if 'DH' in s:
+    #     return False
+    # try:
+    #     int(s)
+    #     return False
+    # except ValueError:
+    #     return True
+
+
+def get_raceclassforspeeds(cl):
+    cl = cl and cl.strip()
+    hkjcclasses = {
+    "Hong Kong Group One": u'Group',
+    "Hong Kong Group Two": u'Group',
+    "Hong Kong Group Three": u'Group',
+    "HongKongGroupThree": u'Group',
+    "HongKongGroupTwo": u'Group',
+    "HongKongGroupOne": u'Group',
+    "Class1": u'Class 1',
+    "Class2": u'Class 2',
+    "Class3": u'Class 3',
+    "Class4": u'Class 4',
+    "Class5": u'Class 5',
+    "Class 1": u'Class 1',
+    "Class 2": u'Class 2',
+    "Class 3": u'Class 3',
+    "Class 4": u'Class 4',
+    "Class 5": u'Class 5',
+    "1": u'Class 1',
+    "2": u'Class 2',
+    "3": u'Class 3',
+    "4": u'Class 4',
+    "4S": u'Class 4',
+    "5": u'Class 5',
+    "GRIFFIN": u'Griffin',
+    }
+    return hkjcclasses.get(cl, "None")
+
+# ex inout u'Class 4'
+def get_raceclassabb(cl):
+    cl = cl and cl.strip()
+    hkjcclasses = {
+    "Group One": u'G1',
+    "Group Two": u'G2',
+    "Group Three": u'G3',
+    "Hong Kong Group One": u'HKG1',
+    "Hong Kong Group Two": u'HKG2',
+    "Hong Kong Group Three": u'HKG3',
+    "HongKongGroupThree": u'HKG3',
+    "HongKongGroupTwo": u'HKG2',
+    "HongKongGroupOne": u'HKG1',
+    "Class 1": u'1',
+    "Class 2": u'2',
+    "Class 3": u'3',
+    "Class 4": u'4',
+    "Class 5": u'5',
+    "Class 4S": u'4S', 
+    "Class 3S": u'3S',
+    "Class 5S": u'5S',
+    "Restricted": u'R',
+    "Griffin": u'Griffin'
+    }
+    return hkjcclasses.get(cl, "None")
+
+def getclassrank(cl):
+    return ['G3', 'G2', 'G1', 'HKG1', 'HKG2', 'HKG3', '1', '2', '3', '3S', '4', '4S', '5', '5S', 'R', 'GRIFFIN'].index(cl) +1
+
+
+
+def getclasschange(cl1, cl2):
+    if len(cl1) > 4:
+        cl1 = get_raceclassabb(cl1)
+    if len(cl2) > 4:
+        cl2 = get_raceclassabb(cl2)
+    if cl1 is not None and cl2 is not None:
+        return getclassrank(cl1) - getclassrank(cl2)
+
+
+'''
+yearofbirth
+if NH -> 01/01
+SH -> 08/01
+'''
+
+def getdateofbirth(referencedate, age, countryoforigin):
+    d1 = referencedate - relativedelta(years=age)
+    print(d1)
+    if countryoforigin in ['AUS', 'NZ', 'RSA']:
+        d2 = d1.replace(month=8, day=1)
+    else:
+        d2 = d1.replace(month=1, day=1)
+    return d2.date()
+
+#RE_HCODE = re.compile(r'value=\"[A-Z]\d{3}\"')
+#convenience function from Constantin
+def tf(values, encoding="utf-8"):
+    value = ""
+    for v in values:
+        if v is not None and v != "":
+            value = v
+            break
+    return value.encode(encoding).strip()
+
+
+
+def processplace(p):
+    try:
+        rtn = int(p)
+    except ValueError:
+        if "DH" in p:
+            rtn = " ".join(re.findall('\d+', p))
+        else:
+            rtn = 99
+    return rtn
 
 def getnethorseprize(place, prize):
     entry = prize*0.03
@@ -14,7 +172,7 @@ def getnethorseprize(place, prize):
     '3': 0.115,
     '4': 0.06,
     }.get(place, 0.0)
-    return (factor*prize) - entry
+    return round( (factor*prize) - entry,3)
 
 
 def testregex(pat,s):
@@ -519,6 +677,10 @@ def getmetaspeedrank(htl, rectl):
 
 ##########
 
+def median(lst):
+    return round( np.median(np.array(lst)), 3)
+
+
 def processscmpplace(place):
     place99 = ['DISQ', 'DNF', 'FE', 'PU', 'TNP', 'UR', 'VOID', 'WD', 'WR', 'WV', 'WV-A', 'WX', 'WX-A']
     if place is None:
@@ -551,6 +713,8 @@ def timeprocessor(value):
 
 def horselengthprocessor(value):
     #covers '' and '-'
+    if value == '--':
+        return None
     if value is None:
         return None
     if '---' in value:
